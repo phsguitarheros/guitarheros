@@ -10,10 +10,11 @@
         .panel { background: #2d1a3d; padding: 20px; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); margin-bottom: 20px; border: 1px solid #4a2b63; }
         .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
         .tool-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid #4a2b63; }
-        #drop-zone { border: 2px dashed #4a2b63; border-radius: 12px; padding: 20px; margin-bottom: 15px; cursor: pointer; }
+        #drop-zone { border: 2px dashed #4a2b63; border-radius: 12px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: 0.3s; }
+        #drop-zone:hover { background: rgba(255, 255, 255, 0.1); }
         .video-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; position: relative; }
         video { width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; border: 2px solid #4a2b63; }
-        button { padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 8px; border: none; cursor: pointer; margin: 5px; }
+        button { padding: 10px 20px; font-size: 14px; font-weight: 600; border-radius: 8px; border: none; cursor: pointer; margin: 5px; transition: 0.2s; }
         .btn-primary { background: #bb86fc; color: #1a0f24; }
         .btn-record { background: #03dac6; color: #000; }
         .btn-stop { background: #cf6679; color: white; }
@@ -24,6 +25,7 @@
         .metro-active { background: #03dac6; box-shadow: 0 0 10px #03dac6; }
         #countdown { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 100px; color: #03dac6; font-weight: bold; z-index: 100; display: none; }
         #upload { display: none; }
+        .privacy-note { margin-top: 50px; padding: 20px; font-size: 12px; color: #888; border-top: 1px solid #2d1a3d; max-width: 600px; line-height: 1.5; text-align: center; }
     </style>
 </head>
 <body>
@@ -39,7 +41,7 @@
             <button class="btn-primary" style="font-size:12px; margin-top:10px;" onclick="startTuner()">Enable Tuner</button>
         </div>
         <div class="tool-card">
-            <small>Dr. Beat Metronome</small><br>
+            <small>Steady Click Metronome</small><br>
             <input type="number" id="bpm" value="100" min="40" max="220" style="width:60px; background:#1a0f24; color:white; border:1px solid #4a2b63; padding:5px; margin-top:5px;"> <small>BPM</small><br>
             <div id="metro-light" class="metro-circle"></div><br>
             <button id="metroBtn" class="btn-primary" style="font-size:12px;" onclick="toggleMetronome()">Start Metronome</button>
@@ -54,7 +56,7 @@
         <button id="setupBtn" class="btn-primary">Enable Camera & Mic</button>
         <button id="startBtn" class="btn-record" style="display:none;">Start Recording</button>
         <button id="stopBtn" class="btn-stop" style="display:none;">Stop</button>
-        <button id="downloadBtn" class="btn-primary" style="display:none; background:#3700b3; color:white;">Download</button>
+        <button id="downloadBtn" class="btn-primary" style="display:none; background:#3700b3; color:white;">Download Recording</button>
         <button id="retakeBtn" class="btn-primary" style="display:none; background:#666; color:white;">Retake</button>
     </div>
 
@@ -63,6 +65,10 @@
         <video id="refVideo"></video>
         <video id="webcam" autoplay muted playsinline></video>
     </div>
+
+    <footer class="privacy-note">
+        <strong>Privacy Note:</strong> This tool processes video and audio entirely within your own web browser. No video data, audio, or personal information is ever uploaded to GitHub or any external server. Your recording is temporarily stored in your computer's memory and is permanently deleted as soon as you close this browser tab.
+    </footer>
 </div>
 
 <script>
@@ -75,8 +81,8 @@
     const retakeBtn = document.getElementById('retakeBtn');
     const fileInput = document.getElementById('upload');
 
-    let recorder, chunks = [], activeStream = null, audioCtx, metroRunning = false, nextTickTime = 0, beatCount = 0;
-    let pitchHistory = []; // For smoothing the tuner
+    let recorder, chunks = [], activeStream = null, audioCtx, metroRunning = false, nextTickTime = 0;
+    let pitchHistory = [];
 
     fileInput.onchange = (e) => {
         const file = e.target.files[0];
@@ -126,13 +132,12 @@
     stopBtn.onclick = () => { recorder.stop(); refVideo.pause(); stopBtn.style.display = 'none'; };
     retakeBtn.onclick = () => { window.location.reload(); };
 
-    // --- DR. BEAT METRONOME ---
+    // --- STEADY CLICK METRONOME ---
     function toggleMetronome() {
         if (!audioCtx) audioCtx = new AudioContext();
         metroRunning = !metroRunning;
         document.getElementById('metroBtn').innerText = metroRunning ? "Stop Metronome" : "Start Metronome";
         if (metroRunning) {
-            beatCount = 0;
             nextTickTime = audioCtx.currentTime;
             scheduler();
         }
@@ -140,17 +145,16 @@
 
     function scheduler() {
         while (nextTickTime < audioCtx.currentTime + 0.1) {
-            playTick(nextTickTime, beatCount % 4 === 0);
+            playTick(nextTickTime);
             nextTickTime += 60.0 / document.getElementById('bpm').value;
-            beatCount++;
         }
         if (metroRunning) window.setTimeout(scheduler, 25);
     }
 
-    function playTick(time, isDownbeat) {
+    function playTick(time) {
         const osc = audioCtx.createOscillator();
         const envelope = audioCtx.createGain();
-        osc.frequency.value = isDownbeat ? 880 : 440; // Dr. Beat style tones
+        osc.frequency.value = 440; // Constant steady tone
         envelope.gain.exponentialRampToValueAtTime(1, time);
         envelope.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
         osc.connect(envelope);
@@ -178,9 +182,8 @@
             if (freq !== -1) {
                 let val = 12 * (Math.log(freq / 440) / Math.log(2)) + 69;
                 pitchHistory.push(val);
-                if(pitchHistory.length > 10) pitchHistory.shift();
+                if(pitchHistory.length > 12) pitchHistory.shift();
                 let avg = pitchHistory.reduce((a,b) => a+b) / pitchHistory.length;
-                
                 let noteIndex = Math.round(avg) % 12;
                 let diff = (avg - Math.round(avg)) * 100;
                 document.getElementById('note-display').innerText = notes[noteIndex];
